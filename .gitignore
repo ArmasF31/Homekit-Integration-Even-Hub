@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Production / Builds
+dist/
+*.ehpk
+*.app/
+
+# Local env files
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor & System Files
+.DS_Store
+.vscode/
+.idea/
+.vite/

@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+    <title>HomeKit G2 Configurator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-color: #121212;
+        --surface-color: #1e1e1e;
+        --surface-light: rgba(255, 255, 255, 0.05);
+        --primary-color: #03a9f4;
+        --primary-glow: rgba(3, 169, 244, 0.3);
+        --text-color: #e5e5e5;
+        --text-muted: #888888;
+        --success-color: #00e676;
+        --error-color: #ff1744;
+        --border-radius: 12px;
+        --transition-speed: 0.25s;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        touch-action: manipulation;
+        -webkit-text-size-adjust: 100%;
+        overscroll-behavior: none;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-sizing: border-box;
+        padding: 24px 16px;
+        overflow-y: auto;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 480px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 8px;
+        animation: fadeIn 0.8s ease-out;
+      }
+
+      header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        margin: 0;
+        background: linear-gradient(135deg, #03a9f4, #00e676);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.5px;
+      }
+
+      header p {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin: 8px 0 0 0;
+      }
+
+      .card {
+        background: var(--surface-color);
+        border: 1px solid var(--surface-light);
+        border-radius: var(--border-radius);
+        padding: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+        color: #ffffff;
+        border-left: 3px solid var(--primary-color);
+        padding-left: 10px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      label {
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+      }
+
+      input {
+        background: var(--bg-color);
+        border: 1px solid var(--surface-light);
+        border-radius: 8px;
+        padding: 12px 14px;
+        color: #ffffff;
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
+      }
+
+      input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px var(--primary-glow);
+      }
+
+      .btn {
+        background: var(--primary-color);
+        color: #121212;
+        border: none;
+        border-radius: 8px;
+        padding: 14px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.1s, opacity var(--transition-speed), box-shadow var(--transition-speed);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .btn:active {
+        transform: scale(0.98);
+      }
+
+      .btn:hover {
+        opacity: 0.9;
+        box-shadow: 0 4px 12px var(--primary-glow);
+      }
+
+      .btn-secondary {
+        background: var(--surface-light);
+        color: var(--text-color);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: none;
+      }
+
+      .btn-danger {
+        background: rgba(255, 23, 68, 0.15);
+        color: var(--error-color);
+        border: 1px solid rgba(255, 23, 68, 0.3);
+      }
+
+      .btn-danger:hover {
+        background: rgba(255, 23, 68, 0.25);
+        box-shadow: 0 4px 12px rgba(255, 23, 68, 0.2);
+      }
+
+      .badge {
+        display: inline-flex;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        align-items: center;
+        gap: 6px;
+        width: fit-content;
+      }
+
+      .badge-neutral {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-muted);
+      }
+
+      .badge-success {
+        background: rgba(0, 230, 118, 0.15);
+        color: var(--success-color);
+      }
+
+      .badge-error {
+        background: rgba(255, 23, 68, 0.15);
+        color: var(--error-color);
+      }
+
+      .entity-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .entity-item {
+        background: var(--bg-color);
+        border: 1px solid var(--surface-light);
+        border-radius: 8px;
+        padding: 10px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform var(--transition-speed);
+      }
+
+      .entity-item:hover {
+        transform: translateX(2px);
+      }
+
+      .entity-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .entity-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: #ffffff;
+      }
+
+      .entity-id {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-family: monospace;
+      }
+
+      .delete-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 4px 8px;
+        font-size: 16px;
+        transition: color var(--transition-speed);
+      }
+
+      .delete-btn:hover {
+        color: var(--error-color);
+      }
+
+      .empty-state {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 13px;
+        padding: 20px 0;
+      }
+
+      #glasses-status {
+        background: rgba(3, 169, 244, 0.08);
+        border: 1px solid rgba(3, 169, 244, 0.2);
+        padding: 14px;
+        border-radius: var(--border-radius);
+        text-align: center;
+        font-size: 13px;
+        color: var(--primary-color);
+      }
+
+      /* Accessory Checklist Styling */
+      .accessory-item {
+        background: var(--bg-color);
+        border: 1px solid var(--surface-light);
+        border-radius: 8px;
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: border-color var(--transition-speed), background-color var(--transition-speed);
+      }
+
+      .accessory-item:hover {
+        background: rgba(255, 255, 255, 0.02);
+        border-color: rgba(3, 169, 244, 0.3);
+      }
+
+      .accessory-checkbox {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--text-muted);
+        border-radius: 4px;
+        outline: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: border-color var(--transition-speed), background-color var(--transition-speed);
+        flex-shrink: 0;
+      }
+
+      .accessory-checkbox:checked {
+        border-color: var(--success-color);
+        background-color: var(--success-color);
+      }
+
+      .accessory-checkbox:checked::after {
+        content: '✓';
+        color: #121212;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .accessory-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        overflow: hidden;
+      }
+
+      .accessory-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: #ffffff;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+
+      .accessory-room {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--bg-color);
+        border: 1px solid var(--surface-light);
+        border-radius: 8px;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: border-color var(--transition-speed);
+      }
+
+      .toggle-row:hover {
+        border-color: rgba(3, 169, 244, 0.3);
+      }
+
+      .toggle-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .toggle-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #ffffff;
+      }
+
+      .toggle-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+
+      .toggle-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.15);
+        transition: background var(--transition-speed), border-color var(--transition-speed);
+        cursor: pointer;
+      }
+
+      .toggle-track::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        transition: transform var(--transition-speed), background var(--transition-speed);
+      }
+
+      .toggle-switch input:checked + .toggle-track {
+        background: rgba(3, 169, 244, 0.3);
+        border-color: var(--primary-color);
+      }
+
+      .toggle-switch input:checked + .toggle-track::after {
+        transform: translateX(20px);
+        background: var(--primary-color);
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>HOMEKIT G2 CONTROL</h1>
+        <p>Configure HomeKit Bridge integration for your G2 Smart Glasses</p>
+      </header>
+
+      <!-- Connection Card -->
+      <section class="card">
+        <h2 class="card-title">HomeKit Bridge Server</h2>
+        <div class="form-group">
+          <label for="bridge-url">Bridge URL</label>
+          <input type="url" id="bridge-url" placeholder="http://192.168.1.100:8123" required />
+        </div>
+        <div class="form-group">
+          <label for="bridge-token">Access Token</label>
+          <input type="password" id="bridge-token" placeholder="Access Token (or placeholder)..." required />
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 4px;">
+          <button id="btn-test" class="btn btn-secondary" style="flex: 1;">Test Connection</button>
+          <button id="btn-save" class="btn" style="flex: 1.5;">Save Config</button>
+        </div>
+        <div id="connection-status" class="badge badge-neutral">
+          Status: Not Configured
+        </div>
+      </section>
+
+      <!-- Display Options Card -->
+      <section class="card">
+        <h2 class="card-title">Display Options</h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+          Choose which sections appear on your G2 glasses home screen.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 4px;">
+          <label class="toggle-row" for="toggle-scenes">
+            <div class="toggle-info">
+              <span class="toggle-label">Scenes</span>
+              <span class="toggle-desc">Quick-access scene launcher</span>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="toggle-scenes" checked />
+              <span class="toggle-track"></span>
+            </div>
+          </label>
+          <label class="toggle-row" for="toggle-all-lights">
+            <div class="toggle-info">
+              <span class="toggle-label">All Lights</span>
+              <span class="toggle-desc">Toggle all lights at once</span>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="toggle-all-lights" checked />
+              <span class="toggle-track"></span>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- Accessories Configuration Card -->
+      <section class="card" id="accessories-card" style="display: none;">
+        <h2 class="card-title">Select Accessories to Show</h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+          Deselect any devices you want to hide on your G2 glasses.
+        </p>
+        <div id="accessories-container" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- Glass Companion status -->
+      <div id="glasses-status">
+        Companion WebView is running. Look through your glasses to navigate.
+      </div>
+    </div>
+
+    <!-- Script Entry -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
