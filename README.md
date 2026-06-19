@@ -112,3 +112,11 @@ homekit-control/
 ├── package.json         # Project dependencies & script entries
 └── tsconfig.json        # TypeScript compiler configurations
 ```
+
+---
+
+## 👥 Contributors
+
+* **[ArmasF31](https://github.com/ArmasF31)** — Project Creator & Lead Developer
+* **Antigravity** — AI Coding Assistant by Google DeepMind
+* **Claude** — AI Assistant by Anthropic
