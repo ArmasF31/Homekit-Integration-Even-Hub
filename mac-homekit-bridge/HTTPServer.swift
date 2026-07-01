@@ -37,6 +37,7 @@ class Server {
 class HTTPConnection {
     let connection: NWConnection
     let homeKitManager: HomeKitManager
+    var buffer = Data()
     
     init(connection: NWConnection, homeKitManager: HomeKitManager) {
         self.connection = connection
@@ -48,13 +49,62 @@ class HTTPConnection {
     func readRequest() {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self = self else { return }
-            if let data = data, !data.isEmpty, let requestStr = String(data: data, encoding: .utf8) {
-                self.handle(request: requestStr)
+            
+            if let data = data, !data.isEmpty {
+                self.buffer.append(data)
+                
+                if self.isRequestComplete() {
+                    if let requestStr = String(data: self.buffer, encoding: .utf8) {
+                        self.handle(request: requestStr)
+                    }
+                    return
+                }
             }
+            
             if error != nil || isComplete {
                 self.connection.cancel()
+            } else {
+                self.readRequest()
             }
         }
+    }
+    
+    private func isRequestComplete() -> Bool {
+        var separatorRange: Range<Data.Index>? = nil
+        var headerLength = 0
+        
+        if let range = buffer.range(of: "\r\n\r\n".data(using: .utf8)!) {
+            separatorRange = range
+            headerLength = range.lowerBound
+        } else if let range = buffer.range(of: "\n\n".data(using: .utf8)!) {
+            separatorRange = range
+            headerLength = range.lowerBound
+        }
+        
+        guard let sepRange = separatorRange else {
+            return false
+        }
+        
+        let headerData = buffer.subdata(in: 0..<headerLength)
+        guard let headerStr = String(data: headerData, encoding: .utf8) else {
+            return false
+        }
+        
+        let normalizedHeader = headerStr.replacingOccurrences(of: "\r\n", with: "\n")
+        let lines = normalizedHeader.components(separatedBy: "\n")
+        var contentLength = 0
+        for line in lines {
+            let parts = line.split(separator: ":", maxSplits: 1)
+            if parts.count == 2 && String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "content-length" {
+                if let length = Int(String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)) {
+                    contentLength = length
+                    break
+                }
+            }
+        }
+        
+        let totalExpectedLength = sepRange.upperBound + contentLength
+        return buffer.count >= totalExpectedLength
     }
     
     func handle(request: String) {

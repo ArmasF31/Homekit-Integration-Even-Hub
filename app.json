@@ -1,10 +1,10 @@
 {
-  "package_id": "com.armas.evenhub.homekitcontrol",
+  "package_id": "com.armas.evenhub.homeassistant",
   "edition": "202601",
   "name": "HomeKit G2 Control",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "min_app_version": "2.0.0",
-  "min_sdk_version": "0.0.10",
+  "min_sdk_version": "0.0.11",
   "entrypoint": "index.html",
   "permissions": [
     {

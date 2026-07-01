@@ -120,3 +120,4 @@ homekit-control/
 * **[ArmasF31](https://github.com/ArmasF31)** — Project Creator & Lead Developer
 * **Antigravity** — AI Coding Assistant by Google DeepMind
 * **Claude** — AI Assistant by Anthropic
+* **Codex 5.5** — AI Coding Assistant by OpenAI

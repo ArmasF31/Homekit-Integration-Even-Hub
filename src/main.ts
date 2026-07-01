@@ -23,6 +23,11 @@ const SCREEN_ACCESSORY = 3;
 let currentScreen = SCREEN_DASHBOARD;
 let listSelectedIndex = 0;
 
+const SHOW_SCENES_KEY = 'show_scenes';
+const SHOW_ALL_LIGHTS_KEY = 'show_all_lights';
+const HIDDEN_ACCESSORIES_KEY = 'hidden_accessories';
+const FAVORITE_LIGHTS_KEY = 'favorite_light_ids';
+
 // HA API State
 let configLoaded = false;
 let bridgeUrl = '';
@@ -51,26 +56,56 @@ let pageItemsOffset = 0; // index in activeListItems where accessories/scenes st
 
 // Hidden accessories caching
 let cachedHiddenAccessories: string[] = [];
-function loadHiddenAccessoriesCache() {
+let cachedFavoriteLightIds: string[] = [];
+
+function isStoredValue(value: string | null | undefined): value is string {
+  return value !== null && value !== undefined && value !== 'null' && value !== 'undefined';
+}
+
+function parseStringArray(value: string | null): string[] {
+  if (!value) return [];
   try {
-    const str = localStorage.getItem('hidden_accessories') || '[]';
-    cachedHiddenAccessories = JSON.parse(str);
-  } catch (e) {
-    cachedHiddenAccessories = [];
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
   }
 }
-loadHiddenAccessoriesCache();
+
+async function getStoredValue(key: string): Promise<string | null> {
+  let value = localStorage.getItem(key);
+  try {
+    const bridgeValue = await bridge.getLocalStorage(key);
+    if (isStoredValue(bridgeValue)) value = bridgeValue;
+  } catch (error) {
+    console.warn(`Failed to load ${key} from bridge storage:`, error);
+  }
+  return isStoredValue(value) ? value : null;
+}
+
+async function loadHiddenAccessoriesCache(): Promise<void> {
+  cachedHiddenAccessories = parseStringArray(await getStoredValue(HIDDEN_ACCESSORIES_KEY));
+  localStorage.setItem(HIDDEN_ACCESSORIES_KEY, JSON.stringify(cachedHiddenAccessories));
+}
+
+async function loadFavoriteLightsCache(): Promise<void> {
+  cachedFavoriteLightIds = parseStringArray(await getStoredValue(FAVORITE_LIGHTS_KEY));
+  localStorage.setItem(FAVORITE_LIGHTS_KEY, JSON.stringify(cachedFavoriteLightIds));
+}
 
 // Dashboard display preferences
 let showScenes = true;
 let showAllLights = true;
-function loadDashboardPrefs() {
-  showScenes = localStorage.getItem('show_scenes') !== 'false';
-  showAllLights = localStorage.getItem('show_all_lights') !== 'false';
+async function loadDashboardPrefs(): Promise<void> {
+  showScenes = (await getStoredValue(SHOW_SCENES_KEY)) !== 'false';
+  showAllLights = (await getStoredValue(SHOW_ALL_LIGHTS_KEY)) !== 'false';
+  localStorage.setItem(SHOW_SCENES_KEY, String(showScenes));
+  localStorage.setItem(SHOW_ALL_LIGHTS_KEY, String(showAllLights));
 }
-loadDashboardPrefs();
 
 // Dynamic dashboard item indices (set in rebuildActiveList)
+let dashFavoriteCount = 0;
+let dashboardFavoriteLights: AccessoryState[] = [];
 let dashScenesIndex = -1;
 let dashAllLightsIndex = -1;
 let dashRoomsOffset = 0;
@@ -191,6 +226,32 @@ function queueRightPanelUpdate(content: string) {
   });
 }
 
+function getVisibleFavoriteLights(): AccessoryState[] {
+  if (!dashboardData || cachedFavoriteLightIds.length === 0) return [];
+
+  const favoriteIdSet = new Set(cachedFavoriteLightIds);
+  const hiddenIdSet = new Set(cachedHiddenAccessories);
+  const favorites: AccessoryState[] = [];
+
+  dashboardData.rooms.forEach(room => {
+    room.accessories.forEach(acc => {
+      if (acc.domain === 'light' && favoriteIdSet.has(acc.id) && !hiddenIdSet.has(acc.id)) {
+        favorites.push(acc);
+      }
+    });
+  });
+
+  return favorites.sort((a, b) => cachedFavoriteLightIds.indexOf(a.id) - cachedFavoriteLightIds.indexOf(b.id));
+}
+
+function formatFavoriteItem(acc: AccessoryState): string {
+  return `* ${acc.name}`.slice(0, 64);
+}
+
+function renderFavoriteActionStatus(acc: AccessoryState, status: string): string {
+  return `   ${acc.name.toUpperCase()}\n\n${renderBigText(status)}`;
+}
+
 // Build list arrays dynamically based on navigation state
 function rebuildActiveList() {
   if (!dashboardData) {
@@ -205,16 +266,22 @@ function rebuildActiveList() {
 
   if (currentScreen === SCREEN_DASHBOARD) {
     activeListItems = [];
-    let idx = 0;
     dashScenesIndex = -1;
     dashAllLightsIndex = -1;
-    if (showScenes) { dashScenesIndex = idx++; activeListItems.push('Scenes >'); }
-    if (showAllLights) { dashAllLightsIndex = idx++; activeListItems.push('All Lights >'); }
+    dashboardFavoriteLights = getVisibleFavoriteLights().slice(0, MAX_LIST);
+    dashFavoriteCount = dashboardFavoriteLights.length;
+    activeListItems.push(...dashboardFavoriteLights.map(formatFavoriteItem));
+
+    let idx = activeListItems.length;
+    if (showScenes && idx < MAX_LIST) { dashScenesIndex = idx++; activeListItems.push('Scenes >'); }
+    if (showAllLights && idx < MAX_LIST) { dashAllLightsIndex = idx++; activeListItems.push('All Lights >'); }
     dashRoomsOffset = idx;
     // Dashboard rooms are unlikely to exceed 20, but cap just in case
     const rooms = dashboardData.rooms.map(r => `${r.name} >`);
     activeListItems.push(...rooms.slice(0, MAX_LIST - idx));
   } else if (currentScreen === SCREEN_SCENES) {
+    dashFavoriteCount = 0;
+    dashboardFavoriteLights = [];
     // Paginate scenes: 1 Back + up to 17 scenes + optional Prev/More
     const allScenes = dashboardData.scenes;
     const pageSize = MAX_LIST - 2; // reserve Back + possible More/Prev
@@ -229,6 +296,8 @@ function rebuildActiveList() {
     activeListItems.push(...pageScenes.map(s => s.name));
     if (hasMore) { pageMoreIndex = activeListItems.length; activeListItems.push('More >'); }
   } else if (currentScreen === SCREEN_ROOM) {
+    dashFavoriteCount = 0;
+    dashboardFavoriteLights = [];
     const room = dashboardData.rooms[selectedRoomIndex];
     activeRoomAccessories = room.accessories.filter(a => !cachedHiddenAccessories.includes(a.id));
     hasRoomLights = activeRoomAccessories.some(a => a.domain === 'light');
@@ -248,6 +317,8 @@ function rebuildActiveList() {
     activeListItems.push(...pageAccs.map(a => a.name));
     if (hasMore) { pageMoreIndex = activeListItems.length; activeListItems.push('More >'); }
   } else if (currentScreen === SCREEN_ACCESSORY) {
+    dashFavoriteCount = 0;
+    dashboardFavoriteLights = [];
     const acc = activeRoomAccessories[selectedAccessoryIndex];
     activeAccessoryPresets = ['< Back'];
 
@@ -278,8 +349,9 @@ function getRightPanelContent(): string {
     const visibleAccsCount = dashboardData.rooms.reduce((sum, room) => {
       return sum + room.accessories.filter(a => !cachedHiddenAccessories.includes(a.id)).length;
     }, 0);
+    const visibleFavoriteCount = getVisibleFavoriteLights().length;
     const bigTemp = renderBigText(`${dashboardData.average_temp}°`);
-    return `HOME\n\n${bigTemp}\n\n${dashboardData.total_rooms} rooms\n${visibleAccsCount} accessories\n${dashboardData.total_offline} offline\n${dashboardData.total_scenes} scenes`;
+    return `HOME\n\n${bigTemp}\n\n${dashboardData.total_rooms} rooms\n${visibleAccsCount} accessories\n${visibleFavoriteCount} favorites\n${dashboardData.total_offline} offline`;
   }
 
   if (currentScreen === SCREEN_SCENES) {
@@ -374,7 +446,7 @@ async function refreshDashboard() {
   if (data) {
     dashboardData = data;
     // Populate the accessories list in the companion app UI
-    populateAccessories(data.rooms);
+    await populateAccessories(data.rooms);
     // Perform a full display rebuild on first load to populate the rooms/scenes list;
     // otherwise, perform right-panel-only updates to preserve list scroll selection.
     updateDisplay(!isFirstLoad);
@@ -461,12 +533,45 @@ async function triggerAccessoryControl() {
   }
 }
 
+async function toggleFavoriteLight(acc: AccessoryState) {
+  if (!api || isPerformingAction) return;
+
+  isPerformingAction = true;
+  actionStatusMessage = 'Sending';
+  queueRightPanelUpdate(renderFavoriteActionStatus(acc, 'SND'));
+
+  const ok = await api.controlAccessory(acc.id, 'light', 'toggle');
+
+  if (ok) {
+    acc.state = acc.state === 'on' ? 'off' : 'on';
+    if (acc.state === 'off') acc.brightness = null;
+    actionStatusMessage = 'Done';
+    queueRightPanelUpdate(renderFavoriteActionStatus(acc, acc.state === 'on' ? 'ON' : 'OFF'));
+    setTimeout(async () => {
+      isPerformingAction = false;
+      actionStatusMessage = '';
+      await refreshDashboard();
+    }, 800);
+  } else {
+    actionStatusMessage = 'Error';
+    queueRightPanelUpdate(renderFavoriteActionStatus(acc, 'ERR'));
+    setTimeout(() => {
+      isPerformingAction = false;
+      actionStatusMessage = '';
+      updateDisplay(true);
+    }, 1200);
+  }
+}
+
 // Single Tap selection logic
 async function handleSelect() {
   if (!dashboardData) return;
 
   if (currentScreen === SCREEN_DASHBOARD) {
-    if (dashScenesIndex >= 0 && listSelectedIndex === dashScenesIndex) {
+    if (listSelectedIndex < dashFavoriteCount) {
+      const acc = dashboardFavoriteLights[listSelectedIndex];
+      if (acc) await toggleFavoriteLight(acc);
+    } else if (dashScenesIndex >= 0 && listSelectedIndex === dashScenesIndex) {
       scenePage = 0;
       currentScreen = SCREEN_SCENES;
       listSelectedIndex = 0;
@@ -480,6 +585,7 @@ async function handleSelect() {
       await refreshDashboard();
     } else {
       selectedRoomIndex = listSelectedIndex - dashRoomsOffset;
+      if (selectedRoomIndex < 0 || selectedRoomIndex >= dashboardData.rooms.length) return;
       roomPage = 0;
       currentScreen = SCREEN_ROOM;
       listSelectedIndex = 0;
@@ -530,6 +636,7 @@ async function handleSelect() {
       const fixedSlots = 1 + (hasRoomLights && roomPage === 0 ? 1 : 0);
       const pageSize = MAX_LIST - fixedSlots - 1;
       const globalIdx = roomPage * pageSize + (listSelectedIndex - pageItemsOffset);
+      if (!activeRoomAccessories[globalIdx]) return;
       selectedAccessoryIndex = globalIdx;
       currentScreen = SCREEN_ACCESSORY;
       listSelectedIndex = 0;
@@ -603,6 +710,9 @@ async function loadConfig(): Promise<boolean> {
     }
     
     if (url && token) {
+      if (!/^https?:\/\//i.test(url)) {
+        url = 'http://' + url;
+      }
       localStorage.setItem('bridge_url', url);
       localStorage.setItem('bridge_token', token);
       bridgeUrl = url;
@@ -620,6 +730,12 @@ async function loadConfig(): Promise<boolean> {
 
 // Initialize G2 split screen text containers
 async function initGlasses() {
+  await Promise.all([
+    loadHiddenAccessoriesCache(),
+    loadFavoriteLightsCache(),
+    loadDashboardPrefs(),
+  ]);
+
   const loaded = await loadConfig();
 
   // Left scrollable list panel (handles event capture)
@@ -758,8 +874,7 @@ const unsubscribe = bridge.onEvenHubEvent(async (event: any) => {
   }
 });
 
-window.addEventListener('hk-accessories-changed', () => {
-  loadHiddenAccessoriesCache();
+function rebuildCurrentListFromPreferences() {
   // If we are on the dashboard or room screen, we must rebuild the list to reflect additions/removals
   if (currentScreen === SCREEN_DASHBOARD || currentScreen === SCREEN_ROOM) {
     // Rebuild active items list and rebuild the G2 list container
@@ -773,15 +888,33 @@ window.addEventListener('hk-accessories-changed', () => {
     // Otherwise just update the right details panel
     updateDisplay(true);
   }
+}
+
+async function handleDashboardPreferenceChange() {
+  await Promise.all([
+    loadHiddenAccessoriesCache(),
+    loadFavoriteLightsCache(),
+  ]);
+  rebuildCurrentListFromPreferences();
+}
+
+window.addEventListener('hk-accessories-changed', () => {
+  void handleDashboardPreferenceChange();
 });
 
 window.addEventListener('hk-dashboard-prefs-changed', () => {
-  loadDashboardPrefs();
-  if (currentScreen === SCREEN_DASHBOARD) {
-    rebuildActiveList();
-    if (listSelectedIndex >= activeListItems.length) {
-      listSelectedIndex = Math.max(0, activeListItems.length - 1);
+  void (async () => {
+    await loadDashboardPrefs();
+    if (currentScreen === SCREEN_DASHBOARD) {
+      rebuildActiveList();
+      if (listSelectedIndex >= activeListItems.length) {
+        listSelectedIndex = Math.max(0, activeListItems.length - 1);
+      }
+      rebuildPageWithLists(activeListItems, getRightPanelContent());
     }
-    rebuildPageWithLists(activeListItems, getRightPanelContent());
-  }
+  })();
+});
+
+window.addEventListener('hk-favorites-changed', () => {
+  void handleDashboardPreferenceChange();
 });

@@ -324,6 +324,7 @@
         display: flex;
         flex-direction: column;
         gap: 2px;
+        flex: 1;
         overflow: hidden;
       }
 
@@ -339,6 +340,33 @@
       .accessory-room {
         font-size: 12px;
         color: var(--text-muted);
+      }
+
+      .favorite-toggle {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: 1px solid var(--surface-light);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-muted);
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: border-color var(--transition-speed), color var(--transition-speed), background var(--transition-speed);
+      }
+
+      .favorite-toggle.active {
+        border-color: rgba(0, 230, 118, 0.55);
+        background: rgba(0, 230, 118, 0.12);
+        color: var(--success-color);
+      }
+
+      .favorite-toggle:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
       }
 
       .toggle-row {
@@ -492,7 +520,7 @@
       <section class="card" id="accessories-card" style="display: none;">
         <h2 class="card-title">Select Accessories to Show</h2>
         <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
-          Deselect any devices you want to hide on your G2 glasses.
+          Deselect devices to hide them. Mark lights as favorites to pin them at the top of the G2 home list.
         </p>
         <div id="accessories-container" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
           <!-- Populated dynamically -->

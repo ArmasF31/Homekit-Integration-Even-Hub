@@ -43,7 +43,11 @@ export class HomeKitAPI {
   private token: string;
 
   constructor(config: HomeKitConfig) {
-    this.url = config.url.replace(/\/$/, '');
+    let rawUrl = config.url.trim();
+    if (rawUrl && !/^https?:\/\//i.test(rawUrl)) {
+      rawUrl = 'http://' + rawUrl;
+    }
+    this.url = rawUrl.replace(/\/$/, '');
     this.token = config.token;
   }
 

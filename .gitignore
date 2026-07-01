@@ -3,6 +3,7 @@ node_modules/
 
 # Production / Builds
 dist/
+mac-homekit-bridge/build/
 *.ehpk
 *.app/
 
